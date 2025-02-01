@@ -25,6 +25,9 @@ for (let i = 1; ; i++) {
 const lastMessages = {}; // Key: server ID, Value: Message object
 const serverStatuses = {}; // Key: server ID, Value: Status object
 
+// Cache to store fetched server statuses
+const statusCache = {};
+
 // Function to fetch server status and name with retry logic
 async function fetchServerStatus(serverId, retries = 3, delay = 1000) {
   try {
@@ -91,7 +94,7 @@ function formatEmbed(serverName, status) {
   return embed;
 }
 
-// Update the Discord channel every 5 seconds
+// Update the Discord channel every second
 async function updateChannel() {
   const channel = client.channels.cache.get(CHANNEL_ID);
 
@@ -101,10 +104,9 @@ async function updateChannel() {
   }
 
   for (const serverId of SERVER_IDS) {
-    const status = await fetchServerStatus(serverId);
+    const status = statusCache[serverId]; // Use cached data for faster updates
 
     if (status) {
-      serverStatuses[serverId] = status; // Store the status globally
       const embed = formatEmbed(status.serverName, status);
 
       try {
@@ -126,12 +128,25 @@ async function updateChannel() {
   }
 }
 
+// Fetch server statuses every 5 seconds and cache them
+async function fetchAndCacheStatuses() {
+  for (const serverId of SERVER_IDS) {
+    const status = await fetchServerStatus(serverId);
+    if (status) {
+      statusCache[serverId] = status; // Cache the fetched status
+    }
+  }
+}
+
 // Bot login event
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // Start updating the channel every 5 seconds
-  setInterval(updateChannel, 5000);
+  // Start fetching server statuses every 5 seconds
+  setInterval(fetchAndCacheStatuses, 5000);
+
+  // Start updating the Discord channel every second
+  setInterval(updateChannel, 1000);
 });
 
 // Log in to Discord
@@ -148,7 +163,7 @@ app.use(express.json());
 
 // Root route to display server statuses
 app.get('/', (req, res) => {
-  const statuses = Object.entries(serverStatuses).map(([serverId, status]) => {
+  const statuses = Object.entries(statusCache).map(([serverId, status]) => {
     let statusText = '';
     if (!status.isOnline) {
       statusText = 'Offline';
