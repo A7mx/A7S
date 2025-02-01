@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits } from 'discord.js';
 import axios from 'axios';
+import express from 'express';
 
 // Load environment variables
 const BOT_TOKEN = process.env.BOT_TOKEN; // Bot token from .env
 const CHANNEL_ID = process.env.CHANNEL_ID; // Channel ID from .env
+const PORT = process.env.PORT || 3000; // Port for the Express server
 
 // Initialize the Discord bot
 const client = new Client({
@@ -19,8 +21,9 @@ for (let i = 1; ; i++) {
   SERVER_IDS.push(id);
 }
 
-// Global variable to store the last sent messages
+// Global variable to store the last sent messages and server statuses
 const lastMessages = {}; // Key: server ID, Value: Message object
+const serverStatuses = {}; // Key: server ID, Value: Status object
 
 // Function to fetch server status and name
 async function fetchServerStatus(serverId) {
@@ -75,7 +78,7 @@ function formatEmbed(serverName, status) {
     timestamp: new Date(), // Timestamp for when the embed was created
     footer: {
       text: 'Powered by A7madShooter',
-      icon_url: 'https://cdn.discordapp.com/attachments/1131905799296393237/1291111644042362921/IMG_4011.jpg?ex=679f172b&is=679dc5ab&hm=7fc02ea313d032ae25b1432aa6df49673090234e701bb2040812d04aadf35d23&', // Replace with BattleMetrics logo URL
+      icon_url: 'https://i.ibb.co/dwMssPvt/IMG-4011.jpg', // Replace with BattleMetrics logo URL
     },
   };
 
@@ -95,6 +98,7 @@ async function updateChannel() {
     const status = await fetchServerStatus(serverId);
 
     if (status) {
+      serverStatuses[serverId] = status; // Store the status globally
       const embed = formatEmbed(status.serverName, status);
 
       try {
@@ -123,3 +127,47 @@ client.once('ready', () => {
 
 // Log in to Discord
 client.login(BOT_TOKEN);
+
+// -------------------------
+// Express Server Setup
+// -------------------------
+
+const app = express();
+
+// Middleware to parse JSON
+app.use(express.json());
+
+// Root route to display server statuses
+app.get('/', (req, res) => {
+  const statuses = Object.entries(serverStatuses).map(([serverId, status]) => {
+    let statusText = '';
+    if (!status.isOnline) {
+      statusText = 'Offline';
+    } else if (status.playerCount < 55) {
+      statusText = 'Seeding';
+    } else {
+      statusText = 'Online';
+    }
+
+    return {
+      serverName: status.serverName,
+      status: statusText,
+      players: `${status.playerCount}/${status.maxPlayers}`,
+    };
+  });
+
+  res.json({
+    message: 'Server Statuses',
+    statuses,
+  });
+});
+
+// Health check route
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK' });
+});
+
+// Start the Express server
+app.listen(PORT, () => {
+  console.log(`Express server is running on http://localhost:${PORT}`);
+});
