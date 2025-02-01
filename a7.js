@@ -44,9 +44,12 @@ async function fetchServerStatus(serverId, retries = 3, delay = 1000) {
     };
   } catch (error) {
     if (error.response && error.response.status === 429 && retries > 0) {
-      console.warn(`Rate limited while fetching status for server ${serverId}. Retrying in ${delay}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, delay)); // Wait before retrying
-      return fetchServerStatus(serverId, retries - 1, delay * 2); // Retry with exponential backoff
+      const retryAfter = error.response.headers['retry-after'] || delay; // Use Retry-After header if available
+      console.warn(
+        `Rate limited while fetching status for server ${serverId}. Retrying in ${retryAfter}ms...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, retryAfter)); // Wait before retrying
+      return fetchServerStatus(serverId, retries - 1, retryAfter * 2); // Retry with exponential backoff
     } else {
       console.error(`Error fetching status for server ${serverId}:`, error.message);
       return null;
@@ -91,7 +94,7 @@ function formatEmbed(serverName, status) {
   return embed;
 }
 
-// Fetch server statuses every 2 seconds and cache them
+// Fetch server statuses every 5 seconds and cache them
 async function fetchAndCacheStatuses() {
   console.log(`Fetching statuses at ${new Date().toISOString()}...`);
   for (const serverId of SERVER_IDS) {
@@ -99,27 +102,44 @@ async function fetchAndCacheStatuses() {
     if (status) {
       statusCache[serverId] = status; // Cache the fetched status
       console.log(`Cached status for server ${serverId}:`, status);
-
-      // Immediately update the Discord message for this server
-      const channel = client.channels.cache.get(CHANNEL_ID);
-      if (channel) {
-        const embed = formatEmbed(status.serverName, status);
-        try {
-          if (lastMessages[serverId]) {
-            const message = await channel.messages.fetch(lastMessages[serverId].id);
-            await message.edit({ embeds: [embed] });
-            console.log(`Edited message for ${status.serverName}`);
-          } else {
-            const sentMessage = await channel.send({ embeds: [embed] });
-            lastMessages[serverId] = sentMessage;
-            console.log(`Sent new message for ${status.serverName}`);
-          }
-        } catch (error) {
-          console.error(`Failed to update message for ${status.serverName}:`, error.message);
-        }
-      }
     } else {
       console.error(`Failed to fetch status for server ${serverId}`);
+    }
+  }
+}
+
+// Update the Discord channel every second
+async function updateChannel() {
+  const channel = client.channels.cache.get(CHANNEL_ID);
+
+  if (!channel) {
+    console.error('Channel not found!');
+    return;
+  }
+
+  for (const serverId of SERVER_IDS) {
+    const status = statusCache[serverId]; // Use cached data for faster updates
+
+    if (status) {
+      const embed = formatEmbed(status.serverName, status);
+
+      try {
+        if (lastMessages[serverId]) {
+          // Edit the existing message
+          const message = await channel.messages.fetch(lastMessages[serverId].id); // Fetch the message from Discord
+          await message.edit({ embeds: [embed] });
+          console.log(`Edited message for ${status.serverName}`);
+        } else {
+          // Send a new message if none exists
+          const sentMessage = await channel.send({ embeds: [embed] });
+          lastMessages[serverId] = sentMessage; // Store the sent message
+          console.log(`Sent new message for ${status.serverName}`);
+        }
+      } catch (error) {
+        console.error(`Failed to update message for ${status.serverName}:`, error.message);
+      }
+    } else {
+      console.warn(`No cached status found for server ${serverId}`);
     }
   }
 }
@@ -128,8 +148,11 @@ async function fetchAndCacheStatuses() {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // Start fetching server statuses every 2 seconds
-  setInterval(fetchAndCacheStatuses, 2000);
+  // Start fetching server statuses every 5 seconds
+  setInterval(fetchAndCacheStatuses, 5000);
+
+  // Start updating the Discord channel every second
+  setInterval(updateChannel, 1000);
 });
 
 // Log in to Discord
