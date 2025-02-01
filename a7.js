@@ -91,7 +91,7 @@ function formatEmbed(serverName, status) {
   return embed;
 }
 
-// Update the Discord channel every second
+// Update the Discord channel every 5 seconds
 async function updateChannel() {
   const channel = client.channels.cache.get(CHANNEL_ID);
 
@@ -110,14 +110,17 @@ async function updateChannel() {
       try {
         if (lastMessages[serverId]) {
           // Edit the existing message
-          await lastMessages[serverId].edit({ embeds: [embed] });
+          const message = await channel.messages.fetch(lastMessages[serverId].id); // Fetch the message from Discord
+          await message.edit({ embeds: [embed] });
+          console.log(`Edited message for ${status.serverName}`);
         } else {
           // Send a new message if none exists
-          lastMessages[serverId] = await channel.send({ embeds: [embed] });
+          const sentMessage = await channel.send({ embeds: [embed] });
+          lastMessages[serverId] = sentMessage; // Store the sent message
+          console.log(`Sent new message for ${status.serverName}`);
         }
-        console.log(`Updated embed for ${status.serverName}`);
       } catch (error) {
-        console.error(`Failed to update embed for ${status.serverName}:`, error.message);
+        console.error(`Failed to update message for ${status.serverName}:`, error.message);
       }
     }
   }
@@ -127,8 +130,8 @@ async function updateChannel() {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // Start updating the channel every second
-  setInterval(updateChannel, 1000);
+  // Start updating the channel every 5 seconds
+  setInterval(updateChannel, 5000);
 });
 
 // Log in to Discord
