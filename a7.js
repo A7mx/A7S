@@ -91,7 +91,7 @@ function formatEmbed(serverName, status) {
   return embed;
 }
 
-// Fetch server statuses every 5 seconds and cache them
+// Fetch server statuses every 3 seconds and cache them
 async function fetchAndCacheStatuses() {
   console.log(`Fetching statuses at ${new Date().toISOString()}...`);
   for (const serverId of SERVER_IDS) {
@@ -145,8 +145,8 @@ async function updateChannel() {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // Start fetching server statuses every 5 seconds
-  setInterval(fetchAndCacheStatuses, 5000);
+  // Start fetching server statuses every 3 seconds
+  setInterval(fetchAndCacheStatuses, 3000);
 
   // Start updating the Discord channel every second
   setInterval(updateChannel, 1000);
@@ -197,4 +197,13 @@ app.get('/health', (req, res) => {
 // Start the Express server
 app.listen(PORT, () => {
   console.log(`Express server is running on http://localhost:${PORT}`);
+});
+
+// Global error handling
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'Reason:', reason);
 });
