@@ -23,10 +23,7 @@ for (let i = 1; ; i++) {
 
 // Global variable to store the last sent messages and server statuses
 const lastMessages = {}; // Key: server ID, Value: Message object
-const serverStatuses = {}; // Key: server ID, Value: Status object
-
-// Cache to store fetched server statuses
-const statusCache = {};
+const statusCache = {}; // Key: server ID, Value: Status object
 
 // Function to fetch server status and name with retry logic
 async function fetchServerStatus(serverId, retries = 3, delay = 1000) {
@@ -94,6 +91,20 @@ function formatEmbed(serverName, status) {
   return embed;
 }
 
+// Fetch server statuses every 5 seconds and cache them
+async function fetchAndCacheStatuses() {
+  console.log(`Fetching statuses at ${new Date().toISOString()}...`);
+  for (const serverId of SERVER_IDS) {
+    const status = await fetchServerStatus(serverId);
+    if (status) {
+      statusCache[serverId] = status; // Cache the fetched status
+      console.log(`Fetched status for server ${serverId}:`, status);
+    } else {
+      console.error(`Failed to fetch status for server ${serverId}`);
+    }
+  }
+}
+
 // Update the Discord channel every second
 async function updateChannel() {
   const channel = client.channels.cache.get(CHANNEL_ID);
@@ -124,16 +135,8 @@ async function updateChannel() {
       } catch (error) {
         console.error(`Failed to update message for ${status.serverName}:`, error.message);
       }
-    }
-  }
-}
-
-// Fetch server statuses every 5 seconds and cache them
-async function fetchAndCacheStatuses() {
-  for (const serverId of SERVER_IDS) {
-    const status = await fetchServerStatus(serverId);
-    if (status) {
-      statusCache[serverId] = status; // Cache the fetched status
+    } else {
+      console.warn(`No cached status found for server ${serverId}`);
     }
   }
 }
