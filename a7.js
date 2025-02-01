@@ -25,8 +25,8 @@ for (let i = 1; ; i++) {
 const lastMessages = {}; // Key: server ID, Value: Message object
 const serverStatuses = {}; // Key: server ID, Value: Status object
 
-// Function to fetch server status and name
-async function fetchServerStatus(serverId) {
+// Function to fetch server status and name with retry logic
+async function fetchServerStatus(serverId, retries = 3, delay = 1000) {
   try {
     const response = await axios.get(`https://api.battlemetrics.com/servers/${serverId}`);
     const serverData = response.data.data;
@@ -43,8 +43,14 @@ async function fetchServerStatus(serverId) {
       serverName,
     };
   } catch (error) {
-    console.error(`Error fetching status for server ${serverId}:`, error.message);
-    return null;
+    if (error.response && error.response.status === 429 && retries > 0) {
+      console.warn(`Rate limited while fetching status for server ${serverId}. Retrying in ${delay}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay)); // Wait before retrying
+      return fetchServerStatus(serverId, retries - 1, delay * 2); // Retry with exponential backoff
+    } else {
+      console.error(`Error fetching status for server ${serverId}:`, error.message);
+      return null;
+    }
   }
 }
 
@@ -73,7 +79,7 @@ function formatEmbed(serverName, status) {
     description: `**Players:** ${status.playerCount}/${status.maxPlayers}`,
     color: embedColor,
     thumbnail: {
-      url: 'https://i.ibb.co/sp9fyrSv/A7.png', // Replace with your game's logo URL
+      url: 'https://i.ibb.co/dwMssPvt/IMG-4011.jpg', // Replace with your game's logo URL
     },
     timestamp: new Date(), // Timestamp for when the embed was created
     footer: {
