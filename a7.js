@@ -76,10 +76,10 @@ function formatEmbed(serverName, status) {
 
   const embed = {
     title: `${circleEmoji} ${statusText} | ${serverName}`,
-    description: `**Players:** ${status.playerCount}/${status.maxPlayers}`,
+    description: `**Players:**\n\n**${status.playerCount} / ${status.maxPlayers}**`,
     color: embedColor,
     thumbnail: {
-      url: 'https://i.ibb.co/dwMssPvt/IMG-4011.jpg', // Replace with your game's logo URL
+      url: 'https://i.ibb.co/sp9fyrSv/A7.png', // Replace with your game's logo URL
     },
     timestamp: new Date(), // Timestamp for when the embed was created
     footer: {
@@ -91,7 +91,7 @@ function formatEmbed(serverName, status) {
   return embed;
 }
 
-// Update the Discord channel every 5 seconds
+// Update the Discord channel every second
 async function updateChannel() {
   const channel = client.channels.cache.get(CHANNEL_ID);
 
@@ -127,8 +127,8 @@ async function updateChannel() {
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 
-  // Start updating the channel every 5 seconds
-  setInterval(updateChannel, 5000);
+  // Start updating the channel every second
+  setInterval(updateChannel, 1000);
 });
 
 // Log in to Discord
